@@ -1,0 +1,247 @@
+{
+  "workflow_name": "OpenShift Cluster Health Diagnostics",
+  "description": "Comprehensive cluster health check with data extraction and cross-step variable usage",
+  "steps": [
+    {
+      "step_id": 1,
+      "name": "Get Cluster Version",
+      "command": "oc version",
+      "expected_output": {
+        "type": "contains",
+        "value": "Server Version"
+      },
+      "extract_data": {
+        "ocp_version": {
+          "regex": "Server Version: (\\d+\\.\\d+\\.\\d+)",
+          "group": 1
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": true,
+        "recommendation": "Ensure you are logged into an OpenShift cluster with 'oc login'"
+      }
+    },
+    {
+      "step_id": 2,
+      "name": "Get Current Project",
+      "command": "oc project -q",
+      "expected_output": {
+        "type": "regex",
+        "pattern": "^[a-z0-9-]+$"
+      },
+      "extract_data": {
+        "current_project": {
+          "regex": "^(.+)$",
+          "group": 1
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Switch to a valid project with 'oc project <project-name>'"
+      }
+    },
+    {
+      "step_id": 3,
+      "name": "Check Cluster Nodes Status",
+      "command": "oc get nodes -o json",
+      "expected_output": {
+        "type": "contains",
+        "value": "Ready"
+      },
+      "extract_data": {
+        "node_count": {
+          "regex": "\"type\": \"Ready\"",
+          "group": 0
+        },
+        "first_node": {
+          "jsonPath": "items[0].metadata.name"
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Check node status with 'oc get nodes' and investigate any NotReady nodes"
+      }
+    },
+    {
+      "step_id": 4,
+      "name": "Get Node Details",
+      "command": "oc describe node ${first_node}",
+      "expected_output": {
+        "type": "contains",
+        "value": "Conditions"
+      },
+      "extract_data": {
+        "node_cpu": {
+          "regex": "cpu:\\s+(\\d+)",
+          "group": 1
+        },
+        "node_memory": {
+          "regex": "memory:\\s+(\\d+Ki)",
+          "group": 1
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Verify node ${first_node} exists and is accessible"
+      }
+    },
+    {
+      "step_id": 5,
+      "name": "Check Cluster Operators",
+      "command": "oc get clusteroperators",
+      "expected_output": {
+        "type": "contains",
+        "value": "Available"
+      },
+      "extract_data": {
+        "degraded_operators": {
+          "regex": "(\\S+)\\s+\\S+\\s+True",
+          "group": 1
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Check degraded operators with 'oc get co' and investigate with 'oc describe co <operator-name>'"
+      }
+    },
+    {
+      "step_id": 6,
+      "name": "List Pods in Current Project",
+      "command": "oc get pods -n ${current_project} -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "pod_count": {
+          "jsonPath": "items"
+        },
+        "first_pod": {
+          "jsonPath": "items[0].metadata.name"
+        },
+        "first_pod_status": {
+          "jsonPath": "items[0].status.phase"
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Check if project ${current_project} has any pods deployed"
+      }
+    },
+    {
+      "step_id": 7,
+      "name": "Get Pod Logs (if pod exists)",
+      "command": "oc logs ${first_pod} -n ${current_project} --tail=20",
+      "expected_output": {
+        "type": "not_contains",
+        "value": "Error from server"
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Pod ${first_pod} may not exist or may not have logs yet"
+      }
+    },
+    {
+      "step_id": 8,
+      "name": "Check Persistent Volume Claims",
+      "command": "oc get pvc -n ${current_project}",
+      "expected_output": {
+        "type": "regex",
+        "pattern": "(Bound|Pending|No resources found)"
+      },
+      "extract_data": {
+        "pvc_count": {
+          "regex": "^(\\S+)\\s+Bound",
+          "group": 0
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Check PVC status in project ${current_project}"
+      }
+    },
+    {
+      "step_id": 9,
+      "name": "Check Services in Project",
+      "command": "oc get svc -n ${current_project} -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "service_count": {
+          "jsonPath": "items"
+        },
+        "first_service": {
+          "jsonPath": "items[0].metadata.name"
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "No services found in project ${current_project}"
+      }
+    },
+    {
+      "step_id": 10,
+      "name": "Check Routes in Project",
+      "command": "oc get routes -n ${current_project}",
+      "expected_output": {
+        "type": "regex",
+        "pattern": "(NAME|No resources found)"
+      },
+      "extract_data": {
+        "route_count": {
+          "regex": "^(\\S+)\\s+\\S+",
+          "group": 0
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Check route configuration in project ${current_project}"
+      }
+    },
+    {
+      "step_id": 11,
+      "name": "Check Cluster Resource Usage",
+      "command": "oc adm top nodes",
+      "expected_output": {
+        "type": "contains",
+        "value": "CPU"
+      },
+      "extract_data": {
+        "node_cpu_usage": {
+          "regex": "${first_node}\\s+(\\d+)%",
+          "group": 1
+        }
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Metrics server may not be available. Check with 'oc get pods -n openshift-monitoring'"
+      }
+    },
+    {
+      "step_id": 12,
+      "name": "Check Events in Project",
+      "command": "oc get events -n ${current_project} --sort-by='.lastTimestamp' | tail -10",
+      "expected_output": {
+        "type": "regex",
+        "pattern": "(LAST SEEN|No resources found)"
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Unable to retrieve events for project ${current_project}"
+      }
+    },
+    {
+      "step_id": 13,
+      "name": "Summary - Cluster Info",
+      "command": "echo 'Cluster Version: ${ocp_version} | Project: ${current_project} | Nodes: ${node_count} | First Node: ${first_node} (CPU: ${node_cpu}, Memory: ${node_memory}) | Pods: ${pod_count} | Services: ${service_count}'",
+      "expected_output": {
+        "type": "contains",
+        "value": "Cluster Version"
+      },
+      "on_failure": {
+        "stop_on_failure": false,
+        "recommendation": "Review extracted data from previous steps"
+      }
+    }
+  ]
+}

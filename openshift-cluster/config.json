@@ -1,0 +1,8 @@
+{
+  "service_name": "OpenShift Cluster Health",
+  "description": "Comprehensive OpenShift cluster diagnostics and health checks",
+  "version": "1.0.0",
+  "workflow_file": "diagnostic-workflow.json",
+  "dependencies": ["oc", "kubectl"],
+  "tags": ["openshift", "kubernetes", "cluster", "diagnostics"]
+}
