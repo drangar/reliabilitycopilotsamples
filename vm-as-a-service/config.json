@@ -1,1 +1,9 @@
-
+{
+  "service_name": "vm-as-a-service",
+  "description": "Virtual machine provisioning service diagnostics for OpenShift Virtualization",
+  "version": "1.0.0",
+  "dependencies": ["OpenShift Virtualization", "KubeVirt", "CDI"],
+  "workflow_file": "diagnostic-workflow.json",
+  "tags": ["vm", "virtualization", "kubevirt"],
+  "maintainer": "sovereign-core-team@example.com"
+}

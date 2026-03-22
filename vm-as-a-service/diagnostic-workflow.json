@@ -1,0 +1,179 @@
+{
+  "workflow_name": "vm-service-diagnostics",
+  "description": "Diagnostic workflow for virtual machine provisioning issues",
+  "steps": [
+    {
+      "step_id": 1,
+      "name": "Check OpenShift Virtualization Operator",
+      "command": "oc get csv -n openshift-cnv -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "operator_version": {
+          "jsonPath": "items[0].spec.version"
+        },
+        "operator_phase": {
+          "jsonPath": "items[0].status.phase"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Install OpenShift Virtualization operator from OperatorHub",
+        "stop_on_failure": true
+      }
+    },
+    {
+      "step_id": 2,
+      "name": "Verify HyperConverged CR Status",
+      "command": "oc get hyperconverged -n openshift-cnv -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "hco_name": {
+          "jsonPath": "items[0].metadata.name"
+        },
+        "hco_conditions": {
+          "jsonPath": "items[0].status.conditions[?(@.type=='Available')].status"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Check HyperConverged CR conditions and operator logs",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 3,
+      "name": "Check KubeVirt Deployment",
+      "command": "oc get kubevirt -n openshift-cnv -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "kubevirt_phase": {
+          "jsonPath": "items[0].status.phase"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Verify KubeVirt deployment and check virt-operator logs",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 4,
+      "name": "List Virtual Machines",
+      "command": "oc get vmi -A -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "vm_count": {
+          "jsonPath": "items.length"
+        },
+        "running_vms": {
+          "jsonPath": "items[?(@.status.phase=='Running')].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Check if VMs are properly defined and have required resources",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 5,
+      "name": "Check VM Templates",
+      "command": "oc get templates -n openshift -l template.kubevirt.io/type=base",
+      "expected_output": {
+        "type": "regex",
+        "pattern": ".*"
+      },
+      "extract_data": {
+        "template_count": {
+          "regex": "^(\\S+)",
+          "group": 0
+        }
+      },
+      "on_failure": {
+        "recommendation": "Ensure common VM templates are available in openshift namespace",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 6,
+      "name": "Verify Storage Classes",
+      "command": "oc get storageclass -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "storage_classes": {
+          "jsonPath": "items[*].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Configure appropriate storage classes for VM disk provisioning",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 7,
+      "name": "Check CDI (Containerized Data Importer)",
+      "command": "oc get cdi -n openshift-cnv -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "cdi_phase": {
+          "jsonPath": "items[0].status.phase"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Verify CDI deployment for VM disk image imports",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 8,
+      "name": "Check virt-launcher Pods",
+      "command": "oc get pods -A -l kubevirt.io=virt-launcher -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "launcher_pods": {
+          "jsonPath": "items[*].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Check virt-launcher pod logs for VM runtime issues",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 9,
+      "name": "Verify Network Attachments",
+      "command": "oc get network-attachment-definitions -A",
+      "expected_output": {
+        "type": "regex",
+        "pattern": ".*"
+      },
+      "on_failure": {
+        "recommendation": "Configure network attachment definitions for VM networking",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 10,
+      "name": "Check Recent VM Events",
+      "command": "oc get events -A --field-selector involvedObject.kind=VirtualMachine --sort-by='.lastTimestamp' | tail -20",
+      "expected_output": {
+        "type": "regex",
+        "pattern": ".*"
+      },
+      "on_failure": {
+        "recommendation": "Review VM events for errors or warnings",
+        "stop_on_failure": false
+      }
+    }
+  ]
+}

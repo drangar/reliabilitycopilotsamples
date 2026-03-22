@@ -1,0 +1,87 @@
+{
+  "flow_name": "vm-service-ai-diagnostics",
+  "description": "AI-powered diagnostics for VM provisioning issues",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "input-1",
+      "type": "TextInput",
+      "position": { "x": 100, "y": 100 },
+      "data": {
+        "name": "Diagnostic Output",
+        "description": "Raw diagnostic output from VM workflow execution",
+        "value": "${diagnostic_output}"
+      }
+    },
+    {
+      "id": "prompt-1",
+      "type": "PromptTemplate",
+      "position": { "x": 300, "y": 100 },
+      "data": {
+        "template": "You are an expert in OpenShift Virtualization and KubeVirt. Analyze the following diagnostic output from a VM provisioning workflow and provide:\n\n1. Root cause analysis of any VM provisioning failures\n2. Specific recommendations to resolve the issue\n3. Best practices for VM configuration\n4. Preventive measures\n\nDiagnostic Output:\n{diagnostic_output}\n\nProvide a structured analysis with clear, actionable steps.",
+        "variables": ["diagnostic_output"]
+      }
+    },
+    {
+      "id": "llm-1",
+      "type": "ChatOpenAI",
+      "position": { "x": 500, "y": 100 },
+      "data": {
+        "model_name": "gpt-4",
+        "temperature": 0.3,
+        "max_tokens": 1000
+      }
+    },
+    {
+      "id": "parser-1",
+      "type": "StrOutputParser",
+      "position": { "x": 700, "y": 100 },
+      "data": {
+        "name": "Parse Response"
+      }
+    },
+    {
+      "id": "output-1",
+      "type": "TextOutput",
+      "position": { "x": 900, "y": 100 },
+      "data": {
+        "name": "AI Recommendations"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-1",
+      "source": "input-1",
+      "target": "prompt-1",
+      "sourceHandle": "output",
+      "targetHandle": "diagnostic_output"
+    },
+    {
+      "id": "edge-2",
+      "source": "prompt-1",
+      "target": "llm-1",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    },
+    {
+      "id": "edge-3",
+      "source": "llm-1",
+      "target": "parser-1",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    },
+    {
+      "id": "edge-4",
+      "source": "parser-1",
+      "target": "output-1",
+      "sourceHandle": "output",
+      "targetHandle": "input"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-03-22T00:00:00Z",
+    "updated_at": "2026-03-22T00:00:00Z",
+    "author": "Sovereign Core Team"
+  }
+}
