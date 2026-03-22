@@ -1,0 +1,125 @@
+{
+  "workflow_name": "cluster-service-diagnostics",
+  "description": "Diagnostic workflow for cluster provisioning issues",
+  "steps": [
+    {
+      "step_id": 1,
+      "name": "Check ACM Hub Status",
+      "command": "oc get multiclusterhub -A -o json",
+      "expected_output": {
+        "type": "json",
+        "schema": {
+          "items": "object"
+        }
+      },
+      "extract_data": {
+        "hub_namespace": {
+          "jsonPath": "items[0].metadata.namespace"
+        },
+        "hub_name": {
+          "jsonPath": "items[0].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Ensure ACM MultiClusterHub is installed and running. Check operator logs.",
+        "stop_on_failure": true
+      }
+    },
+    {
+      "step_id": 2,
+      "name": "List Managed Clusters",
+      "command": "oc get managedclusters -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "cluster_count": {
+          "jsonPath": "items.length"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Check if managed clusters are properly registered with ACM hub",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 3,
+      "name": "Check ACM Policies Status",
+      "command": "oc get policies -A",
+      "expected_output": {
+        "type": "regex",
+        "pattern": ".*"
+      },
+      "extract_data": {
+        "policy_list": {
+          "regex": "^(\\S+)\\s+(\\S+)",
+          "group": 0
+        }
+      },
+      "on_failure": {
+        "recommendation": "Verify ACM policies are created and check policy controller logs",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 4,
+      "name": "Check Policy Compliance",
+      "command": "oc get policies -A -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "non_compliant_policies": {
+          "jsonPath": "items[?(@.status.compliant=='NonCompliant')].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Review non-compliant policies and check target cluster status",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 5,
+      "name": "Check ClusterDeployment Status",
+      "command": "oc get clusterdeployment -A -o json",
+      "expected_output": {
+        "type": "json"
+      },
+      "extract_data": {
+        "failed_deployments": {
+          "jsonPath": "items[?(@.status.conditions[?(@.type=='ProvisionFailed' && @.status=='True')])].metadata.name"
+        }
+      },
+      "on_failure": {
+        "recommendation": "Check Hive operator logs and cluster deployment conditions",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 6,
+      "name": "Verify Cluster Provisioning Pods",
+      "command": "oc get pods -n ${hub_namespace} -l app=cluster-provisioning",
+      "expected_output": {
+        "type": "regex",
+        "pattern": "Running"
+      },
+      "on_failure": {
+        "recommendation": "Check cluster provisioning pod logs and ensure sufficient resources",
+        "stop_on_failure": false
+      }
+    },
+    {
+      "step_id": 7,
+      "name": "Check Recent Events",
+      "command": "oc get events -n ${hub_namespace} --sort-by='.lastTimestamp' | tail -20",
+      "expected_output": {
+        "type": "regex",
+        "pattern": ".*"
+      },
+      "on_failure": {
+        "recommendation": "Review events for errors or warnings related to cluster provisioning",
+        "stop_on_failure": false
+      }
+    }
+  ]
+}

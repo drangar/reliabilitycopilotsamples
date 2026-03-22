@@ -1,1 +1,9 @@
-
+{
+  "service_name": "cluster-as-a-service",
+  "description": "Cluster provisioning service diagnostics for OpenShift clusters managed by ACM",
+  "version": "1.0.0",
+  "dependencies": ["ACM", "OpenShift", "Hive"],
+  "workflow_file": "diagnostic-workflow.json",
+  "tags": ["cluster", "provisioning", "acm"],
+  "maintainer": "sovereign-core-team@example.com"
+}
